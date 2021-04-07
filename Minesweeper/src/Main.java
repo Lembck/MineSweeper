@@ -136,6 +136,9 @@ class MineSweeper extends World {
 
   int flagCount;
 
+  boolean gameover;
+  boolean won;
+
   Random r;
 
   ArrayList<Square> grid;
@@ -149,6 +152,8 @@ class MineSweeper extends World {
     this.gridCount = widthCount * heightCount;
     this.grid = new ArrayList<Square>();
     this.flagCount = 0;
+    this.gameover = false;
+    this.won = false;
 
     this.r = new Random();
 
@@ -160,6 +165,22 @@ class MineSweeper extends World {
     this.setNeighbors();
     this.countNeighboringBombs();
 
+  }
+
+  public void resetGame() {
+    this.gameover = false;
+    this.won = false;
+    for (Square s : this.grid) {
+      s.isCovered = true;
+      s.neighboringBombCount = 0;
+      s.isBomb = false;
+      s.isFlagged = false;
+      this.flagCount = 0;
+      
+    }
+    this.setBombs();
+    this.countNeighboringBombs();
+   
   }
 
   private void setNeighbors() {
@@ -228,19 +249,24 @@ class MineSweeper extends World {
     ws.placeImageXY(grid, this.width/2, this.height/2);
     ws.placeImageXY(new TextImage(Integer.toString(this.bombCount - this.flagCount), Color.black), this.width/2, c.hPadding / 2);
 
+    if (this.gameover) {
+      String s = "You Lost!";
+      if (this.won) { s = "You Won!"; }
+      ws.placeImageXY(new TextImage(s, Color.black), this.width/2, this.height - c.hPadding/2);
+    }
+
     return ws;
   }
 
-  public WorldScene makeScene(String s) {
-    WorldScene scene = this.makeScene();
-    scene.placeImageXY(new TextImage(s, Color.black), this.width/2, this.height - c.hPadding/2);
-    return scene;
-  }
 
   public void onLeftClicked(Square s) {
     if (!s.isFlagged) {
       if (s.isBomb) {
-        this.endOfWorld("lost");
+        this.gameover = true;
+        for (Square otherS : this.grid) {
+          otherS.isFlagged = false;
+          otherS.setUncovered();
+        }
       } else if (s.neighboringBombCount == 0) {
         this.expandUncovered(s.id);
       } 
@@ -257,8 +283,10 @@ class MineSweeper extends World {
 
   public void onMouseClicked(Posn pos, String buttonName) {
     int id = new Utils().posToId(pos, this.widthCount, this.heightCount);
-    
-    if (id >= 0 && id < this.gridCount) {
+
+    if (this.gameover) {
+      this.resetGame();
+    } else if (id >= 0 && id < this.gridCount) {
       Square s = this.grid.get(id);
       if (buttonName == "LeftButton") {
         this.onLeftClicked(s);
@@ -267,15 +295,16 @@ class MineSweeper extends World {
       }
     }
   }
-  
+
   public void checkOver() {
     if (this.bombCount == this.flagCount) {
+      this.gameover = true;
+      this.won = true;
       for (Square s : this.grid) {
         if ((s.isBomb && !s.isFlagged) || (s.isFlagged && !s.isBomb)) {
-          this.endOfWorld("You Lost!");
+          this.won = false;
         }
       }
-      this.endOfWorld("You Won!");
     }
   }
 
@@ -295,7 +324,7 @@ class MineSweeper extends World {
       otherS.isFlagged = false;
       otherS.setUncovered();
     }
-    return this.makeScene(s);
+    return this.makeScene();
   }
 
 }
@@ -303,7 +332,7 @@ class MineSweeper extends World {
 class Examples {
   Examples() {}
 
-  MineSweeper world = new MineSweeper(20, 12, 32);
+  MineSweeper world = new MineSweeper(10, 6, 8);
 
   void testBigBang(Tester t) {
     int worldWidth = this.world.width;
