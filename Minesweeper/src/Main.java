@@ -59,6 +59,8 @@ class Square {
   boolean isCovered;
   boolean isFlagged;
 
+  ArrayList<Square> neighbors;
+
   Utils c = new Utils();
 
   Square(int id) {
@@ -66,6 +68,7 @@ class Square {
     this.isCovered = true;
     this.isBomb = false;
     this.neighboringBombCount = 0;
+    this.neighbors = new ArrayList<Square>();
   }
 
   public void setBomb() {
@@ -114,6 +117,12 @@ class Square {
     this.isFlagged = true;
     return 1;
   }
+
+  public void setNeighbors(ArrayList<Integer> neighborIds, ArrayList<Square> grid) {
+    for (int i : neighborIds) {
+      this.neighbors.add(grid.get(i));
+    }
+  }
 }
 
 class MineSweeper extends World {
@@ -124,7 +133,7 @@ class MineSweeper extends World {
 
   int width;
   int height;
-  
+
   int flagCount;
 
   Random r;
@@ -148,17 +157,23 @@ class MineSweeper extends World {
 
     this.createGrid();
     this.setBombs();
+    this.setNeighbors();
     this.countNeighboringBombs();
 
+  }
+
+  private void setNeighbors() {
+    for (Square s : this.grid) {
+      ArrayList<Integer> neighborIds = new Utils().getNeighborIds(s.id, this.widthCount, this.gridCount);
+      s.setNeighbors(neighborIds, this.grid);
+    }
   }
 
   private void countNeighboringBombs() {
     for (Square s : this.grid) {
       if (!s.isBomb) {
-        ArrayList<Integer> neighborIds = new Utils().getNeighborIds(s.id, this.widthCount, this.gridCount);
-
-        for (int id : neighborIds) {
-          if (this.grid.get(id).isBomb) {
+        for (Square nS : s.neighbors) {
+          if (nS.isBomb) {
             s.neighboringBombCount++;
           }
         }
@@ -215,66 +230,61 @@ class MineSweeper extends World {
 
     return ws;
   }
-  
+
   public WorldScene makeScene(String s) {
     WorldScene scene = this.makeScene();
     scene.placeImageXY(new TextImage(s, Color.black), this.width/2, this.height - c.hPadding/2);
     return scene;
   }
 
-  public void onLeftClicked(Posn pos) {
-    int id = new Utils().posToId(pos, this.widthCount, this.heightCount);
-    Square s = this.grid.get(id);
-    if (s.isFlagged) {
-      return;
+  public void onLeftClicked(Square s) {
+    if (!s.isFlagged) {
+      if (s.isBomb) {
+        this.endOfWorld("lost");
+      } else if (s.neighboringBombCount == 0) {
+        this.expandUncovered(s.id);
+      } 
+      s.setUncovered();
     }
-    if (s.isBomb) {
-      this.endOfWorld("lost");
-    } else if (s.neighboringBombCount == 0) {
-      this.expandUncovered(id);
-    } 
-    s.setUncovered();
-
   }
 
-  private void onRightClicked(Posn pos) {
-    int id = new Utils().posToId(pos, this.widthCount, this.heightCount);
-    Square s = this.grid.get(id);
-    
+  private void onRightClicked(Square s) {
     if (s.isCovered) {
       this.flagCount += s.toggleFlagged();
+      this.checkOver();
     }
-    
-    System.out.println(this.flagCount);
   }
 
   public void onMouseClicked(Posn pos, String buttonName) {
-    if (buttonName == "LeftButton") {
-      this.onLeftClicked(pos);
-    } else if (buttonName == "RightButton") {
-      this.onRightClicked(pos);
-    }
+    int id = new Utils().posToId(pos, this.widthCount, this.heightCount);
     
+    if (id >= 0 && id < this.gridCount) {
+      Square s = this.grid.get(id);
+      if (buttonName == "LeftButton") {
+        this.onLeftClicked(s);
+      } else if (buttonName == "RightButton") {
+        this.onRightClicked(s);
+      }
+    }
+  }
+  
+  public void checkOver() {
     if (this.bombCount == this.flagCount) {
       for (Square s : this.grid) {
         if ((s.isBomb && !s.isFlagged) || (s.isFlagged && !s.isBomb)) {
-          this.endOfWorld("lost");
+          this.endOfWorld("You Lost!");
         }
       }
-      this.endOfWorld("won");
+      this.endOfWorld("You Won!");
     }
   }
 
   private void expandUncovered(int id) {
-    System.out.println("Expanding Uncovered " + id);
-    ArrayList<Integer> neighborIds = new Utils().getNeighborIds(id, this.widthCount, this.gridCount);
-
-    for (int nId : neighborIds) {
-      Square s = this.grid.get(nId);
+    for (Square s : this.grid.get(id).neighbors) {
       if (!s.isBomb && s.isCovered) {
         s.setUncovered();
         if (s.neighboringBombCount == 0) {
-          expandUncovered(nId);
+          expandUncovered(s.id);
         }
       }
     }
