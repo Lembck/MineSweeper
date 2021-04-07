@@ -62,12 +62,15 @@ class Square {
   ArrayList<Square> neighbors;
 
   Utils c = new Utils();
+  public int neighboringFlagCount;
+  public int neighboringCoveredCount;
 
   Square(int id) {
     this.id = id;
     this.isCovered = true;
     this.isBomb = false;
     this.neighboringBombCount = 0;
+    this.neighboringFlagCount = 0;
     this.neighbors = new ArrayList<Square>();
   }
 
@@ -101,20 +104,31 @@ class Square {
               0, 0, new RectangleImage(c.squareLength - 2, c.squareLength - 2, OutlineMode.SOLID, Color.gray)),
           0, 0, new RectangleImage(c.squareLength, c.squareLength, OutlineMode.SOLID, Color.black));
     }
-
+    
     return img;
   }
 
   public void setUncovered() {
-    this.isCovered = false;
+    if (this.isCovered) {
+      this.isCovered = false;
+      for (Square n : this.neighbors) {
+        n.neighboringCoveredCount -= 1;
+      }
+    }
   }
 
   public int toggleFlagged() {
     if (this.isFlagged) {
       this.isFlagged = false;
+      for (Square n : this.neighbors) {
+        n.neighboringFlagCount -= 1;
+      }
       return -1;
     } 
     this.isFlagged = true;
+    for (Square n : this.neighbors) {
+      n.neighboringFlagCount += 1;
+    }
     return 1;
   }
 
@@ -122,6 +136,7 @@ class Square {
     for (int i : neighborIds) {
       this.neighbors.add(grid.get(i));
     }
+    this.neighboringCoveredCount = this.neighbors.size();
   }
 }
 
@@ -135,6 +150,8 @@ class MineSweeper extends World {
   int height;
 
   int flagCount;
+  
+  Posn mouseCoords;
 
   boolean gameover;
   boolean won;
@@ -151,9 +168,7 @@ class MineSweeper extends World {
     this.bombCount = bombCount;
     this.gridCount = widthCount * heightCount;
     this.grid = new ArrayList<Square>();
-    this.flagCount = 0;
-    this.gameover = false;
-    this.won = false;
+    this.mouseCoords = new Posn(0, 0);
 
     this.r = new Random();
 
@@ -161,26 +176,32 @@ class MineSweeper extends World {
     this.calculateHeight();
 
     this.createGrid();
-    this.setBombs();
     this.setNeighbors();
-    this.countNeighboringBombs();
+    
+    this.setUp();
 
+  }
+  
+  public void setUp() {
+    this.gameover = false;
+    this.won = false;
+    this.flagCount = 0;
+
+    this.setBombs();
+    this.countNeighboringBombs();
   }
 
   public void resetGame() {
-    this.gameover = false;
-    this.won = false;
     for (Square s : this.grid) {
       s.isCovered = true;
       s.neighboringBombCount = 0;
+      s.neighboringFlagCount = 0;
+      s.neighboringCoveredCount = s.neighbors.size();
       s.isBomb = false;
       s.isFlagged = false;
-      this.flagCount = 0;
-      
     }
-    this.setBombs();
-    this.countNeighboringBombs();
-   
+    
+    this.setUp();
   }
 
   private void setNeighbors() {
@@ -201,6 +222,8 @@ class MineSweeper extends World {
       }
     }
   }
+  
+  
 
   private void calculateWidth() {
     this.width = this.widthCount * c.squareLength + c.wPadding * 2;
@@ -269,8 +292,11 @@ class MineSweeper extends World {
         }
       } else if (s.neighboringBombCount == 0) {
         this.expandUncovered(s.id);
-      } 
-      s.setUncovered();
+        s.setUncovered();
+      } else {
+        s.setUncovered();
+      }
+      
     }
   }
 
@@ -294,6 +320,36 @@ class MineSweeper extends World {
         this.onRightClicked(s);
       }
     }
+  }
+  
+  public void onKeyEvent(String key) {
+    if (key.equals(" ")) {
+      int id = new Utils().posToId(this.mouseCoords, this.widthCount, this.heightCount);
+      if (this.gameover) {
+        this.resetGame();
+      } else if (id >= 0 && id < this.gridCount) {
+        Square s = this.grid.get(id);
+        if (!s.isCovered && s.neighboringBombCount != 0 && s.neighboringBombCount == s.neighboringFlagCount) {
+          for (Square n : s.neighbors) {
+            this.onLeftClicked(n);
+          }
+        } else if (!s.isCovered && s.neighboringBombCount != 0 && s.neighboringBombCount > s.neighboringFlagCount
+            && s.neighboringBombCount == s.neighboringCoveredCount) {
+          System.out.println("converting " + s.neighboringFlagCount + "  " + s.neighboringBombCount + " " + s.neighboringCoveredCount);
+          for (Square n : s.neighbors) {
+            if (!n.isFlagged) {
+              this.onRightClicked(n);
+            }
+          }
+        } else {
+          System.out.println( s.neighboringFlagCount + "  " + s.neighboringBombCount + " " + s.neighboringCoveredCount);
+        }
+      }
+    }
+  }
+  
+  public void onMouseMoved(Posn pos) {
+    this.mouseCoords = pos;
   }
 
   public void checkOver() {
@@ -332,12 +388,12 @@ class MineSweeper extends World {
 class Examples {
   Examples() {}
 
-  MineSweeper world = new MineSweeper(10, 6, 8);
+  MineSweeper world = new MineSweeper(30, 16, 99);
 
   void testBigBang(Tester t) {
     int worldWidth = this.world.width;
     int worldHeight = this.world.height;
-    double tickRate = 0.1;
+    double tickRate = 0.03;
     this.world.bigBang(worldWidth, worldHeight, tickRate);
   }
 }
