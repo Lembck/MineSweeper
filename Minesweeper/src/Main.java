@@ -164,7 +164,7 @@ class MineSweeper extends World {
   Random r;
 
   ArrayList<Square> grid;
-  Hashtable<Integer, Square> toBeSolved;
+  ArrayList<Integer> toBeSolved;
   ArrayList<Integer> idsTried;
 
   Utils c = new Utils();
@@ -196,7 +196,7 @@ class MineSweeper extends World {
 
     this.setBombs();
     this.countNeighboringBombs();
-    this.toBeSolved = new Hashtable<Integer, Square>();
+    this.toBeSolved = new ArrayList<Integer>();
     this.idsTried = new ArrayList<Integer>();
   }
 
@@ -304,7 +304,7 @@ class MineSweeper extends World {
         s.setUncovered();
       } else {
         s.setUncovered();
-        this.toBeSolved.put(s.id, s);
+        this.toBeSolved.add(s.id);
       }
 
     }
@@ -388,7 +388,7 @@ class MineSweeper extends World {
         if (s.neighboringBombCount == 0) {
           expandUncovered(s.id);
         } else {
-          this.toBeSolved.put(s.id, s);
+          this.toBeSolved.add(s.id);
         }
       }
     }
@@ -409,38 +409,47 @@ class MineSweeper extends World {
       if (method == "random") {
         clickRandom();
       } else if (method == "auto") {
-        ArrayList<Integer> keysAsArray = new ArrayList<Integer>(this.toBeSolved.keySet());
         
         if (this.toBeSolved.size() > 0 && this.toBeSolved.size() > this.idsTried.size()) {
-          System.out.println("ToBeSolvedSize " + this.toBeSolved.size());
-          System.out.println("IdsTriedSize " + this.idsTried.size());
+         
           
-          int randomKey = r.nextInt(this.toBeSolved.size());
+          /*int randomKey = r.nextInt(this.toBeSolved.size());
           while (this.idsTried.contains(randomKey)) {
             randomKey = r.nextInt(this.toBeSolved.size());
             //System.out.println(randomKey);
+          }*/
+          
+          int randomKey = this.toBeSolved.size() - 1;
+          while (randomKey >= 0 && this.idsTried.contains(this.toBeSolved.get(randomKey))) {
+            randomKey--;
+          }
+          // -1 here means something broke
+          if (randomKey != -1) {
+            Square toBeSolved = this.grid.get(this.toBeSolved.get(randomKey));
+            //System.out.println(toBeSolved.id);
+            
+            if (this.solveSquare(toBeSolved)) {
+              this.idsTried = new ArrayList<Integer>();
+            } else {
+              this.idsTried.add(toBeSolved.id);
+            }
+          } else {
+            System.out.println(this.idsTried.size() + "/" + this.toBeSolved.size());
           }
           
-          Square toBeSolved = this.toBeSolved.get(keysAsArray.get(randomKey));
-          if (this.solveSquare(toBeSolved)) {
-            //System.out.println("reseting idsTried");
-            this.idsTried = new ArrayList<Integer>();
-          } else {
-            this.idsTried.add(toBeSolved.id);
-          }
         } else {
           clickRandom();
         }
       }
 
     } else {
-      this.resetGame();
+      //this.resetGame();
     }
     
-    Hashtable<Integer, Square> temp = new Hashtable<Integer, Square>();
-    for (Integer i : new ArrayList<Integer>(this.toBeSolved.keySet())) {
-      if (this.grid.get(i).neighboringCoveredCount != this.grid.get(i).neighboringFlagCount) {
-        temp.put(i, this.toBeSolved.get(i));
+    ArrayList<Integer> temp = new ArrayList<Integer>();
+    for (Integer i : this.toBeSolved) {
+      if (this.grid.get(i).neighboringCoveredCount != this.grid.get(i).neighboringFlagCount && !temp.contains(i)) {
+        temp.add(i);
       }
     }
     this.toBeSolved = temp;
@@ -462,12 +471,12 @@ class MineSweeper extends World {
 class Examples {
   Examples() {}
 
-  MineSweeper world = new MineSweeper(16, 16, 40);
+  MineSweeper world = new MineSweeper(30, 16, 99);
 
   void testBigBang(Tester t) {
     int worldWidth = this.world.width;
     int worldHeight = this.world.height;
-    double tickRate = 0.25;
+    double tickRate = 0.1;
     this.world.bigBang(worldWidth, worldHeight, tickRate);
   }
 }
